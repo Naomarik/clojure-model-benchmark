@@ -29,7 +29,7 @@ Repository = "https://github.com/naomarik/clojure-model-benchmark"
 Issues = "https://github.com/naomarik/clojure-model-benchmark/issues"
 
 [project.optional-dependencies]
-dev = ["ruff==0.12.4"]
+dev = ["ruff==0.15.22"]
 
 [tool.setuptools]
 py-modules = []
