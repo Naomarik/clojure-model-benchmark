@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clojure-model-benchmark"
+version = "0.1.0"
+description = "Open benchmark for one-shot Clojure correctness and agentic REPL debugging"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Naomi Rik" },
+]
+keywords = ["clojure", "llm", "benchmark", "coding-agents", "repl"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Software Development :: Testing",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/naomarik/clojure-model-benchmark"
+Repository = "https://github.com/naomarik/clojure-model-benchmark"
+Issues = "https://github.com/naomarik/clojure-model-benchmark/issues"
+
+[project.optional-dependencies]
+dev = ["ruff==0.12.4"]
+
+[tool.setuptools]
+py-modules = []
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["artifacts", ".opencode/node_modules"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501", "UP017"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

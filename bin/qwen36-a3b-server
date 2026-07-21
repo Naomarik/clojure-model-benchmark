@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+NAME="Qwen3.6 35B A3B"
+PORT="${QWEN36_A3B_PORT:-8081}"
+HOST="${QWEN36_A3B_HOST:-127.0.0.1}"
+SLOTS="${QWEN36_A3B_SLOTS:-4}"
+# llama-server divides this total context across slots: 524288 / 4 = 131072.
+CTX="${QWEN36_A3B_CTX:-524288}"
+BATCH="${QWEN36_A3B_BATCH:-4096}"
+UBATCH="${QWEN36_A3B_UBATCH:-2048}"
+THINKING="${QWEN36_A3B_THINKING:-0}"
+THINK_BUDGET="${QWEN36_A3B_THINK_BUDGET:-1400}"
+PREDICT="${QWEN36_A3B_PREDICT:-32768}"
+SPEC="${QWEN36_A3B_SPEC:-ngram-simple}"
+
+RUNTIME_PARENT="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
+RUNTIME_DIR="${QWEN36_A3B_RUNTIME_DIR:-$RUNTIME_PARENT/clojure-model-benchmark}"
+LOG_FILE="$RUNTIME_DIR/qwen36-a3b-server.log"
+STDOUT_FILE="$RUNTIME_DIR/qwen36-a3b-server.stdout"
+PID_FILE="$RUNTIME_DIR/qwen36-a3b-server.pid"
+
+usage() {
+  cat <<EOF
+Usage: $0 {start|stop|restart|status|logs}
+
+Required for start:
+  QWEN36_A3B_MODEL       Path to the model GGUF
+  LLAMA_SERVER_BIN       Path to llama-server (optional when it is on PATH)
+
+Optional:
+  QWEN36_A3B_MMPROJ      Path to a multimodal projector GGUF
+  QWEN36_A3B_PORT        Listen port (default: 8081)
+  QWEN36_A3B_THINKING    Set to 1 to enable thinking (default: 0)
+EOF
+}
+
+pid_value() {
+  local pid started
+  [[ -f "$PID_FILE" ]] && IFS=' ' read -r pid started < "$PID_FILE" && printf '%s' "$pid"
+}
+
+pid_matches() {
+  local pid started
+  local -a stat_fields
+  [[ -f "$PID_FILE" ]] || return 1
+  IFS=' ' read -r pid started < "$PID_FILE"
+  [[ "$pid" =~ ^[0-9]+$ && "$started" =~ ^[0-9]+$ && -r "/proc/$pid/stat" ]] || return 1
+  read -ra stat_fields < "/proc/$pid/stat"
+  [[ "${stat_fields[21]:-}" == "$started" ]]
+}
+
+is_running() {
+  local pid
+  pid="$(pid_value || true)"
+  [[ "$pid" =~ ^[0-9]+$ ]] && pid_matches && kill -0 "$pid" 2>/dev/null
+}
+
+show_recent_logs() {
+  if [[ -f "$STDOUT_FILE" ]]; then
+    tail -n 80 "$STDOUT_FILE" >&2 || true
+  fi
+}
+
+wait_ready() {
+  local pid
+  pid="$(pid_value)"
+  for ((attempt = 1; attempt <= 180; attempt++)); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      printf '%s server exited before becoming ready. Recent logs:\n' "$NAME" >&2
+      show_recent_logs
+      return 1
+    fi
+    if curl -fsS --max-time 2 "http://$HOST:$PORT/v1/models" >/dev/null 2>&1; then
+      printf '%s server is ready: http://%s:%s/v1\n' "$NAME" "$HOST" "$PORT"
+      return 0
+    fi
+    sleep 1
+  done
+  printf '%s server did not become ready. Recent logs:\n' "$NAME" >&2
+  show_recent_logs
+  return 1
+}
+
+stop() {
+  local pid
+  pid="$(pid_value || true)"
+  if [[ "$pid" =~ ^[0-9]+$ ]] && pid_matches && kill -0 "$pid" 2>/dev/null; then
+    kill "$pid"
+    for ((attempt = 1; attempt <= 30; attempt++)); do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if pid_matches && kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid"
+    fi
+    printf 'Stopped %s server.\n' "$NAME"
+  else
+    printf '%s server is not running.\n' "$NAME"
+  fi
+  rm -f "$PID_FILE"
+}
+
+start() {
+  local server model mmproj
+  local -a thinking_args mmproj_args
+  mkdir -p "$RUNTIME_DIR"
+  if is_running; then
+    printf '%s server is already running, pid %s\n' "$NAME" "$(pid_value)"
+    return 0
+  fi
+  rm -f "$PID_FILE"
+
+  server="${LLAMA_SERVER_BIN:-$(command -v llama-server || true)}"
+  model="${QWEN36_A3B_MODEL:-}"
+  mmproj="${QWEN36_A3B_MMPROJ:-}"
+  if [[ -z "$server" || ! -x "$server" ]]; then
+    printf 'Set LLAMA_SERVER_BIN to an executable llama-server, or add it to PATH.\n' >&2
+    return 1
+  fi
+  if [[ -z "$model" ]]; then
+    printf 'QWEN36_A3B_MODEL is required and must point to the model GGUF.\n' >&2
+    return 1
+  fi
+  if [[ ! -f "$model" ]]; then
+    printf 'Model not found: %s\n' "$model" >&2
+    return 1
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    printf 'curl is required for readiness checks.\n' >&2
+    return 1
+  fi
+
+  thinking_args=(--reasoning-budget 0 --chat-template-kwargs '{"enable_thinking":false}')
+  if [[ "$THINKING" == "1" ]]; then
+    thinking_args=(--reasoning-format deepseek --reasoning-budget "$THINK_BUDGET")
+  fi
+  mmproj_args=()
+  if [[ -n "$mmproj" ]]; then
+    if [[ ! -f "$mmproj" ]]; then
+      printf 'Multimodal projector not found: %s\n' "$mmproj" >&2
+      return 1
+    fi
+    mmproj_args=(--mmproj "$mmproj" --mmproj-offload)
+  fi
+
+  nohup "$server" -m "$model" "${mmproj_args[@]}" \
+    --host "$HOST" --port "$PORT" -ngl 99 -fa on -c "$CTX" -n "$PREDICT" \
+    -np "$SLOTS" -b "$BATCH" -ub "$UBATCH" "${thinking_args[@]}" \
+    --spec-type "$SPEC" --log-file "$LOG_FILE" > "$STDOUT_FILE" 2>&1 &
+  local pid="$!"
+  local -a stat_fields
+  read -ra stat_fields < "/proc/$pid/stat"
+  printf '%s %s\n' "$pid" "${stat_fields[21]}" > "$PID_FILE"
+  if ! wait_ready; then
+    stop >/dev/null
+    return 1
+  fi
+}
+
+status() {
+  if is_running; then
+    printf 'Running, pid %s, endpoint http://%s:%s/v1\n' "$(pid_value)" "$HOST" "$PORT"
+  else
+    printf 'Not running.\n'
+  fi
+}
+
+logs() {
+  if [[ ! -f "$STDOUT_FILE" ]]; then
+    printf 'No log file yet: %s\n' "$STDOUT_FILE" >&2
+    return 1
+  fi
+  tail -n 120 -f "$STDOUT_FILE"
+}
+
+case "${1:-}" in
+  start) start ;;
+  stop) stop ;;
+  restart) stop; start ;;
+  status) status ;;
+  logs) logs ;;
+  *) usage; exit 2 ;;
+esac

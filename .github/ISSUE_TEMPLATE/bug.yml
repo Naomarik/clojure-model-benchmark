@@ -1,0 +1,35 @@
+name: Bug report
+description: Report a reproducible harness, fixture, grader, or documentation problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach credentials or unsanitized raw run artifacts.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Provide minimal commands and sanitized output.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Benchmark revision or version
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Linux distribution and Python, Babashka, OpenCode, and llama.cpp versions as relevant.
+    validations:
+      required: true

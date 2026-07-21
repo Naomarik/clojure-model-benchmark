@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up pinned Babashka
+        uses: DeLaGuardo/setup-clojure@13.2
+        with:
+          bb: "1.12.218"
+
+      - name: Install release tooling
+        run: python -m pip install ruff==0.12.4
+
+      - name: Lint Python sources
+        run: ruff check .
+
+      - name: Compile Python sources
+        run: python -m py_compile *.py suites/eval_clojure.py
+
+      - name: Validate one-shot graders
+        run: python validate_new_cases.py
+
+      - name: Validate REPL fixtures and references
+        run: python validate_repl_cases.py
+
+      - name: Smoke REPL lifecycle
+        run: python repl_runner.py --all --smoke

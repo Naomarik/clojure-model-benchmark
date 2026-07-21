@@ -1,0 +1,35 @@
+name: Benchmark case proposal
+description: Propose a focused one-shot or agentic benchmark case
+title: "[Case]: "
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: suite
+    attributes:
+      label: Suite
+      options:
+        - One-shot correctness
+        - Agentic REPL debugging
+    validations:
+      required: true
+  - type: textarea
+    id: capability
+    attributes:
+      label: Capability or failure mode
+      description: Explain the specific Clojure behavior this case would measure.
+    validations:
+      required: true
+  - type: textarea
+    id: grading
+    attributes:
+      label: Deterministic grading
+      description: Describe how valid alternatives pass and the intended bug fails.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Shortcuts and provenance
+      description: Note likely shortcuts, contamination concerns, and any source material or licensing constraints.
+    validations:
+      required: true

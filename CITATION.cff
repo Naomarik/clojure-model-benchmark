@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this benchmark, please cite the software."
+title: "Clojure Model Benchmark"
+type: software
+authors:
+  - family-names: "Rik"
+    given-names: "Naomi"
+version: 0.1.0
+date-released: 2026-07-21
+license: MIT
+repository-code: "https://github.com/naomarik/clojure-model-benchmark"
+url: "https://github.com/naomarik/clojure-model-benchmark"
+abstract: "An open benchmark for one-shot Clojure correctness and agentic debugging through a live REPL."
+keywords:
+  - Clojure
+  - language models
+  - coding agents
+  - benchmark
+  - REPL
