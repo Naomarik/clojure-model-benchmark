@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the bundled Clojure eval through OpenCode's noninteractive CLI."""
+"""Run the bundled Clojure eval through a noninteractive CLI (OpenCode or Claude Code)."""
 
 import argparse
 import hashlib
@@ -18,6 +18,28 @@ ROOT = Path(__file__).resolve().parent
 DEFAULT_SUITE = ROOT / "suites/eval_clojure.py"
 RUNS_DIR = ROOT / "artifacts/runs"
 SAFE_LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+PROTOCOL_HASH_DOMAIN = b"clojure-model-benchmark-protocol-v1"
+PROTOCOL_PATHS = (
+    ROOT / "runner.py",
+    ROOT / "suites/eval_clojure.py",
+    ROOT / ".opencode/agent/benchmark.md",
+    ROOT / ".opencode/opencode.json",
+)
+
+
+def protocol_hash() -> str:
+    """Hash the canonical one-shot treatment using length-delimited entries."""
+    digest = hashlib.sha256()
+
+    def update(value: bytes) -> None:
+        digest.update(len(value).to_bytes(8, "big"))
+        digest.update(value)
+
+    update(PROTOCOL_HASH_DOMAIN)
+    for path in sorted(PROTOCOL_PATHS, key=lambda item: item.relative_to(ROOT).as_posix()):
+        update(path.relative_to(ROOT).as_posix().encode())
+        update(path.read_bytes())
+    return digest.hexdigest()
 
 
 def load_suite(path: Path):
@@ -35,6 +57,61 @@ def suite_provenance(path: Path) -> str:
         return path.relative_to(ROOT).as_posix()
     except ValueError:
         return path.name
+
+
+def agent_system_prompt(name: str) -> str:
+    """Read an OpenCode agent file and return its body without YAML frontmatter.
+
+    Both transports use the same instruction text so runs stay comparable.
+    """
+    text = (ROOT / f".opencode/agent/{name}.md").read_text()
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end >= 0:
+            text = text[end + 4:]
+    return text.strip()
+
+
+def extract_claude_text(stdout: str) -> tuple[str, dict]:
+    """Extract the final assistant text from `claude -p --output-format json`."""
+    start = stdout.find("{")
+    if start < 0:
+        raise RuntimeError("Claude Code returned no JSON result")
+    payload = json.loads(stdout[start:])
+    if payload.get("is_error"):
+        raise RuntimeError(f"Claude Code error: {str(payload.get('result'))[:500]}")
+    result = payload.get("result")
+    if not isinstance(result, str) or not result:
+        raise RuntimeError("Claude Code returned no assistant text")
+    return result, payload
+
+
+def ask_claude(model: str, prompt: str, timeout: float, effort: str | None) -> tuple[str, str]:
+    command = [
+        "claude", "-p", "--output-format", "json",
+        "--model", model,
+        "--tools", "",
+        "--no-session-persistence",
+        "--setting-sources", "",
+        "--disable-slash-commands",
+        "--strict-mcp-config",
+        "--system-prompt", agent_system_prompt("benchmark"),
+    ]
+    if effort:
+        command += ["--effort", effort]
+    command.append(prompt)
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise RuntimeError(f"Claude Code exited {completed.returncode}: {detail[-500:]}")
+    text, _ = extract_claude_text(completed.stdout)
+    return text, completed.stdout
 
 
 def extract_text(stdout: str) -> str:
@@ -135,7 +212,15 @@ def write_json(path: Path, value) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", required=True, help="OpenCode provider/model ID")
+    parser.add_argument("--model", required=True, help="Model ID for the chosen transport")
+    parser.add_argument(
+        "--transport", choices=("opencode", "claude"), default="opencode",
+        help="Noninteractive CLI to drive: OpenCode or Claude Code",
+    )
+    parser.add_argument(
+        "--effort", choices=("low", "medium", "high", "xhigh", "max"),
+        help="Claude Code effort level (claude transport only; omit for CLI default)",
+    )
     parser.add_argument("--label", required=True, help="Filesystem-safe run label")
     parser.add_argument("--suite", type=Path, default=DEFAULT_SUITE)
     parser.add_argument("--timeout", type=float, default=300.0, help="Seconds per task")
@@ -148,6 +233,8 @@ def main() -> int:
         parser.error("--timeout must be greater than 0")
     if args.concurrency < 1:
         parser.error("--concurrency must be at least 1")
+    if args.effort and args.transport != "claude":
+        parser.error("--effort only applies to --transport claude")
 
     suite_path = args.suite.resolve()
     provenance = suite_provenance(suite_path)
@@ -163,6 +250,7 @@ def main() -> int:
     snapshot = {
         "canonical_suite": provenance,
         "canonical_suite_sha256": suite_sha256,
+        "protocol_sha256": protocol_hash(),
         "total": len(suite.TASKS),
         "tasks": [{"task": name, "prompt": prompt} for name, prompt, _ in suite.TASKS],
     }
@@ -173,11 +261,17 @@ def main() -> int:
         "schema_version": 1,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "label": args.label,
-        "transport": "opencode run --pure --format json --agent benchmark",
+        "transport": (
+            "opencode run --pure --format json --agent benchmark"
+            if args.transport == "opencode"
+            else "claude -p --output-format json --tools ''"
+        ),
         "model": args.model,
+        "effort": args.effort,
         "canonical_suite": provenance,
         "canonical_suite_sha256": suite_sha256,
-        "temperature": 0,
+        "protocol_sha256": protocol_hash(),
+        "temperature": 0 if args.transport == "opencode" else None,
         "concurrency": args.concurrency,
         "fresh_session_per_task": True,
         "score": 0,
@@ -192,7 +286,10 @@ def main() -> int:
         started = time.perf_counter()
         raw_events = None
         try:
-            response, raw_events = ask(args.model, prompt, args.timeout)
+            if args.transport == "claude":
+                response, raw_events = ask_claude(args.model, prompt, args.timeout, args.effort)
+            else:
+                response, raw_events = ask(args.model, prompt, args.timeout)
             passed, detail = checker(response)
         except Exception as error:  # noqa: BLE001 - failures belong in the artifact
             response = None

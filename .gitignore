@@ -16,6 +16,8 @@ build/
 /artifacts/MATRIX.md
 /artifacts/repl-matrix.json
 /artifacts/REPL_MATRIX.md
+/artifacts/overall-matrix.json
+/artifacts/OVERALL_MATRIX.md
 /artifacts/runs/*
 !/artifacts/runs/.gitkeep
 /artifacts/repl-runs/
@@ -55,3 +57,6 @@ opencode.local.json
 .vscode/
 *~
 .DS_Store
+
+# Local analysis notes
+scratch/

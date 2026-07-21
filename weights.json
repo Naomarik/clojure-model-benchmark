@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "metric_version": "correctness-weighted-v1",
+  "rubric_version": "intrinsic-demand-v1",
+  "scoring_definition_sha256": "26d37c069a76255d6b87448a4733bc1ab240de467c794ff571c4ff32188e91e0",
+  "assignment": {
+    "date": "2026-07-21",
+    "timing": "retrospective",
+    "task_analysis": "One primary task analyst assigned the dimension vectors with per-task rationales as evidence.",
+    "audit": "An independent methodology and code audit reviewed the rubric, implementation, and arithmetic.",
+    "preregistered": false,
+    "limitations": "Existing model results were already available, so v1 historical scores are not preregistered."
+  },
+  "normalization": {
+    "one_shot_share": 0.5,
+    "repl_share": 0.5
+  },
+  "dimension_names": [
+    "semantic_breadth",
+    "state_effect_reasoning",
+    "lifecycle_runtime_reasoning",
+    "compositional_edge_cases",
+    "interacting_behavior"
+  ],
+  "total_to_weight_thresholds": [
+    {"min": 0, "max": 1, "weight": 1},
+    {"min": 2, "max": 3, "weight": 2},
+    {"min": 4, "max": 5, "weight": 3},
+    {"min": 6, "max": 7, "weight": 4},
+    {"min": 8, "max": 10, "weight": 5}
+  ],
+  "suites": {
+    "one_shot": {
+      "expected_sha256": "7b90af9a2bface2c6ee43a84c709268e95679a7d29802d5a5d2a38d05d8d3bc9",
+      "expected_protocol_sha256": "a801d645516c900e3bcfd5ac937a81390a360fe795bc12a004c3578dae775664",
+      "task_count": 33,
+      "weight_total": 79,
+      "tasks": {
+        "fn_remove_empty_vals": {
+          "dimensions": [1, 0, 0, 2, 2],
+          "weight": 3,
+          "rationale": "Recursive cleaning, post-recursion emptiness, and preservation of false and zero interact."
+        },
+        "fn_vec_insert": {
+          "dimensions": [1, 0, 0, 1, 1],
+          "weight": 2,
+          "rationale": "Converts arbitrary sequential input and coordinates prefix, item, and suffix splicing."
+        },
+        "fn_pluralize": {
+          "dimensions": [0, 0, 0, 1, 0],
+          "weight": 1,
+          "rationale": "One direct equality branch with one negative case family."
+        },
+        "fn_ago_str": {
+          "dimensions": [1, 0, 0, 2, 2],
+          "weight": 3,
+          "rationale": "An ordered threshold ladder coordinates four derived units and multiple boundaries."
+        },
+        "fn_keywordize_path": {
+          "dimensions": [1, 0, 0, 1, 1],
+          "weight": 2,
+          "rationale": "Handles keyword versus collection input and transforms names into a dotted keyword."
+        },
+        "fn_normalize_email": {
+          "dimensions": [0, 0, 0, 1, 1],
+          "weight": 2,
+          "rationale": "Nil propagation must compose with trimming and lowercasing."
+        },
+        "ds_honeysql_select": {
+          "dimensions": [1, 0, 0, 0, 1],
+          "weight": 2,
+          "rationale": "Translates SQL intent into several coordinated HoneySQL EDN clauses."
+        },
+        "ds_hiccup_card": {
+          "dimensions": [1, 0, 0, 0, 1],
+          "weight": 2,
+          "rationale": "Translates a nested UI description into exact hiccup structure."
+        },
+        "ds_malli_user_schema": {
+          "dimensions": [1, 0, 0, 1, 1],
+          "weight": 2,
+          "rationale": "Coordinates Malli entry syntax, exact order, and optional-property placement."
+        },
+        "fix_submap": {
+          "dimensions": [0, 0, 0, 1, 1],
+          "weight": 2,
+          "rationale": "Corrects map and key direction while retaining map guards."
+        },
+        "fix_update_if_exists": {
+          "dimensions": [0, 0, 0, 1, 0],
+          "weight": 1,
+          "rationale": "A single presence guard surrounds an otherwise direct update."
+        },
+        "edn_status_counts": {
+          "dimensions": [0, 0, 0, 0, 1],
+          "weight": 1,
+          "rationale": "Direct aggregation from status values to counts."
+        },
+        "json_config_to_edn": {
+          "dimensions": [1, 0, 0, 0, 0],
+          "weight": 1,
+          "rationale": "Direct representation conversion with no behavioral interaction."
+        },
+        "strict_unused_binding": {
+          "dimensions": [0, 0, 0, 0, 0],
+          "weight": 1,
+          "rationale": "Direct static identification of one unused local."
+        },
+        "strict_ring_response_edn": {
+          "dimensions": [1, 0, 0, 0, 0],
+          "weight": 1,
+          "rationale": "Direct translation to a specified Ring response map."
+        },
+        "edn_route_names": {
+          "dimensions": [0, 0, 0, 0, 1],
+          "weight": 1,
+          "rationale": "Extracts and sorts one field from a supplied literal route tree."
+        },
+        "ctx_remove_empty_vals": {
+          "dimensions": [1, 0, 0, 2, 2],
+          "weight": 3,
+          "rationale": "Uses the same recursive contract as fn_remove_empty_vals; examples do not add weight."
+        },
+        "ctx_malli_user_schema": {
+          "dimensions": [1, 0, 0, 1, 1],
+          "weight": 2,
+          "rationale": "Uses the same schema contract as ds_malli_user_schema; examples do not add weight."
+        },
+        "hard_require_auth_handler": {
+          "dimensions": [1, 0, 0, 2, 2],
+          "weight": 3,
+          "rationale": "Coordinates authentication, lookup, ownership, non-disclosure, and ordered responses."
+        },
+        "hard_paginated_query": {
+          "dimensions": [2, 1, 0, 2, 2],
+          "weight": 4,
+          "rationale": "Combines query construction, paging, optional filters, false presence, and absent where."
+        },
+        "hard_nest_join_rows": {
+          "dimensions": [1, 0, 0, 2, 2],
+          "weight": 3,
+          "rationale": "Groups flat joins, handles nil offers, nests entities, and sorts both levels."
+        },
+        "hard_hiccup_status_table": {
+          "dimensions": [1, 0, 0, 1, 2],
+          "weight": 3,
+          "rationale": "Coordinates nested hiccup, conditional classes, conversions, order, and empty input."
+        },
+        "hard_day_buckets": {
+          "dimensions": [1, 0, 0, 1, 1],
+          "weight": 2,
+          "rationale": "Combines integer bucket arithmetic, counting, sorted output, and empty input."
+        },
+        "hard_flatten_dict": {
+          "dimensions": [1, 0, 0, 1, 2],
+          "weight": 3,
+          "rationale": "Recursive arbitrary-depth traversal accumulates and encodes paths into keys."
+        },
+        "hard_apply_user_patch": {
+          "dimensions": [0, 1, 0, 2, 1],
+          "weight": 3,
+          "rationale": "Whitelisting distinguishes absence from explicit nil and false while preserving state."
+        },
+        "hard_reitit_path_by_name": {
+          "dimensions": [1, 0, 0, 1, 2],
+          "weight": 3,
+          "rationale": "Recursive first-match search coordinates ancestor paths and absent results."
+        },
+        "hard_honeysql_boolean_tree": {
+          "dimensions": [2, 0, 0, 1, 2],
+          "weight": 3,
+          "rationale": "Requires an exact nested Boolean query shape plus an optional exclusion branch."
+        },
+        "hard_malli_errors_to_tree": {
+          "dimensions": [1, 0, 0, 2, 2],
+          "weight": 3,
+          "rationale": "Builds nested paths, handles integers, aggregates duplicates in order, and handles empty input."
+        },
+        "hard_deep_merge": {
+          "dimensions": [1, 0, 0, 2, 2],
+          "weight": 3,
+          "rationale": "Recursive map-only merging distinguishes all non-map replacements, including nil and false."
+        },
+        "fix_lazy_notification_effects": {
+          "dimensions": [0, 2, 2, 1, 1],
+          "weight": 4,
+          "rationale": "Requires eager ordered exactly-once effects despite laziness, with a fixed nil return."
+        },
+        "hard_normalize_project_pull": {
+          "dimensions": [2, 0, 0, 2, 2],
+          "weight": 4,
+          "rationale": "Normalizes reverse references with filtering, sorting, exact shape, and absent children."
+        },
+        "fix_threading_pipeline": {
+          "dimensions": [0, 0, 1, 1, 1],
+          "weight": 2,
+          "rationale": "Correct threading composes filtering, mapping, sorting, realization, and empty input."
+        },
+        "hard_reduce_until_match": {
+          "dimensions": [0, 1, 2, 2, 2],
+          "weight": 4,
+          "rationale": "Requires reduced short-circuiting, non-realization, false preservation, and no-match behavior."
+        }
+      }
+    },
+    "repl": {
+      "expected_sha256": "3f3bc431e14c3bbf4aec013af403d7df99c5706b5a0ef7823ef12cc20dc87d57",
+      "expected_protocol_sha256": "e79364d90498bc9b7776fd849cf9f02b2e584226370b7b83c2db28fa07a2bfdf",
+      "task_count": 10,
+      "weight_total": 46,
+      "tasks": {
+        "closed-order-stream": {
+          "dimensions": [1, 1, 2, 1, 1],
+          "weight": 4,
+          "rationale": "Lazy consumption crosses reader lifetime; output must be realized and blanks ignored."
+        },
+        "hot-reload-pricing": {
+          "dimensions": [1, 2, 2, 2, 2],
+          "weight": 5,
+          "rationale": "Coordinates parsing, defonce state, reload, atomic replacement, rollback, and pricing."
+        },
+        "tenant-cache": {
+          "dimensions": [1, 2, 1, 2, 2],
+          "weight": 5,
+          "rationale": "Cache identity spans tenant, revision, and product while nil and false remain cached."
+        },
+        "webhook-event-fold": {
+          "dimensions": [1, 2, 0, 2, 2],
+          "weight": 4,
+          "rationale": "Coordinates deduplication, sequence monotonicity, stale IDs, effects, and replay."
+        },
+        "payment-multimethod": {
+          "dimensions": [1, 0, 2, 2, 1],
+          "weight": 4,
+          "rationale": "Requires compound dispatch, exact method membership, defaults, and reload-aware inspection."
+        },
+        "route-registry-reload": {
+          "dimensions": [1, 2, 2, 1, 2],
+          "weight": 5,
+          "rationale": "Macro expansion, Var identity, registry state, reload, idempotence, and dispatch interact."
+        },
+        "transducer-completion": {
+          "dimensions": [1, 1, 2, 2, 2],
+          "weight": 5,
+          "rationale": "Stateful reducer arities, buffered completion, early termination, and completion count interact."
+        },
+        "authorization-lazy-leak": {
+          "dimensions": [1, 1, 2, 2, 2],
+          "weight": 5,
+          "rationale": "Dynamic binding, laziness, authorization order, pagination, realization, and field removal interact."
+        },
+        "dependency-planner": {
+          "dimensions": [2, 0, 0, 2, 2],
+          "weight": 4,
+          "rationale": "Iterative capability planning separates deterministic ties, missing capabilities, and cycles."
+        },
+        "session-derived-index": {
+          "dimensions": [1, 2, 1, 2, 2],
+          "weight": 5,
+          "rationale": "Two persistent atoms maintain an exact index across mutation, rebuild, sorting, and reload."
+        }
+      }
+    }
+  }
+}

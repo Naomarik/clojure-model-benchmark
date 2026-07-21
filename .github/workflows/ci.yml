@@ -34,6 +34,9 @@ jobs:
       - name: Compile Python sources
         run: python -m py_compile *.py suites/eval_clojure.py
 
+      - name: Validate weighting manifest
+        run: python overall_matrix.py --validate
+
       - name: Validate one-shot graders
         run: python validate_new_cases.py
 

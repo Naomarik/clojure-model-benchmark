@@ -4,13 +4,14 @@
 
 Compare remote models through OpenCode's noninteractive CLI using both the canonical one-shot Clojure suite and a separate stateful REPL-debugging suite.
 
-The one-shot and agentic suites use different graders and are never combined into one score.
+The one-shot and agentic suites use different graders and remain separately reported. An optional secondary overall combines only their weighted binary correctness under the versioned policy in `docs/WEIGHTING.md`; REPL-use telemetry is never included.
 
 ## Fairness Contract
 
 - Canonical source: `suites/eval_clojure.py`
 - Prompts and checker callables are imported directly; they are not rewritten.
 - `artifacts/tests.json` snapshots every prompt and the canonical source SHA-256.
+- New run artifacts record a length-delimited protocol SHA-256 covering runner, suite, agent, and project configuration.
 - Each task starts a new OpenCode session with the same benchmark agent.
 - The benchmark agent has temperature 0, no tools, and only requests the prompt's exact output format.
 - OpenCode runs with `--pure`, preventing external plugins from changing requests or responses.
@@ -69,7 +70,7 @@ python validate_new_cases.py
 opencode models
 ```
 
-The SHA-256 must match `canonical_suite_sha256` in every run artifact. If the canonical suite changes, rerun all models rather than mixing hashes.
+The suite SHA-256 and `protocol_sha256` must match the current manifest in every run artifact. If the suite or treatment changes, rerun all models rather than mixing hashes.
 
 ## Agentic REPL Suite
 
@@ -136,4 +137,5 @@ The runner-owned log records the form, response, elapsed time, and current sourc
 - Prompts, timeouts, graders, and reference overlays are versioned with the harness.
 - Grading uses source files in a fresh process; REPL-only `intern`, atom mutation, or `alter-var-root` changes cannot satisfy grader tests.
 - Results preserve raw OpenCode JSONL, assistant text, grader output, REPL evaluations, source hashes, timing, and server logs.
+- New REPL artifacts record a protocol SHA-256 covering runner, client, case metadata, agent, project configuration, fixtures, graders, and references.
 - Correctness and REPL use remain separate; neither is merged with the one-shot matrix.

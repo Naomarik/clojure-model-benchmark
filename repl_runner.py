@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run isolated, stateful Clojure debugging cases through OpenCode."""
+"""Run isolated, stateful Clojure debugging cases through OpenCode or Claude Code."""
 
 import argparse
 import difflib
@@ -25,6 +25,7 @@ RUNS_ROOT = ROOT / "artifacts/repl-runs"
 BB = os.environ.get("BB") or shutil.which("bb") or "bb"
 CLASSPATH = os.pathsep.join(("src", "resources"))
 SAFE_LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+PROTOCOL_HASH_DOMAIN = b"clojure-model-benchmark-protocol-v1"
 
 
 def write_json(path: Path, value) -> None:
@@ -72,6 +73,29 @@ def suite_hash() -> str:
     for path in paths:
         digest.update(str(path.relative_to(ROOT)).encode())
         digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def protocol_hash() -> str:
+    """Hash the canonical REPL treatment using length-delimited entries."""
+    digest = hashlib.sha256()
+    paths = [
+        ROOT / "repl_runner.py",
+        ROOT / "repl_eval.py",
+        ROOT / "repl_cases.py",
+        ROOT / ".opencode/agent/repl-benchmark.md",
+        ROOT / ".opencode/opencode.json",
+    ]
+    paths.extend(path for path in CASES_ROOT.rglob("*") if path.is_file())
+
+    def update(value: bytes) -> None:
+        digest.update(len(value).to_bytes(8, "big"))
+        digest.update(value)
+
+    update(PROTOCOL_HASH_DOMAIN)
+    for path in sorted(paths, key=lambda item: item.relative_to(ROOT).as_posix()):
+        update(path.relative_to(ROOT).as_posix().encode())
+        update(path.read_bytes())
     return digest.hexdigest()
 
 
@@ -144,7 +168,30 @@ def stop_group(process: subprocess.Popen | None) -> None:
         process.wait(timeout=3)
 
 
-def run_opencode(command: list[str], workspace: Path, env: dict, timeout: float) -> dict:
+def agent_system_prompt() -> str:
+    """Return the repl-benchmark agent instructions without YAML frontmatter."""
+    text = (ROOT / ".opencode/agent/repl-benchmark.md").read_text()
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end >= 0:
+            text = text[end + 4:]
+    return text.strip()
+
+
+def extract_claude_text(stdout: str) -> str:
+    start = stdout.find("{")
+    if start < 0:
+        return ""
+    try:
+        payload = json.loads(stdout[start:])
+    except json.JSONDecodeError:
+        return ""
+    result = payload.get("result")
+    return result if isinstance(result, str) else ""
+
+
+def run_agent_cli(command: list[str], workspace: Path, env: dict, timeout: float,
+                  transport: str) -> dict:
     process = subprocess.Popen(
         command, cwd=workspace, env=env, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, text=True, start_new_session=True,
@@ -165,12 +212,13 @@ def run_opencode(command: list[str], workspace: Path, env: dict, timeout: float)
             os.killpg(process.pid, signal.SIGTERM)
         except ProcessLookupError:
             pass
+    extractor = extract_claude_text if transport == "claude" else extract_text
     return {
         "exit_code": None if timed_out else process.returncode,
         "timed_out": timed_out,
         "stdout": stdout,
         "stderr": stderr,
-        "assistant_text": extract_text(stdout),
+        "assistant_text": extractor(stdout),
     }
 
 
@@ -264,7 +312,8 @@ def extract_text(stdout: str) -> str:
     return "".join(parts)
 
 
-def run_case(case: ReplCase, model: str, timeout_override: float | None = None) -> dict:
+def run_case(case: ReplCase, model: str, timeout_override: float | None = None,
+             transport: str = "opencode", effort: str | None = None) -> dict:
     started = time.perf_counter()
     process = None
     with tempfile.TemporaryDirectory(prefix=f"repl-bench-{case.slug}-") as tmp:
@@ -297,16 +346,35 @@ def run_case(case: ReplCase, model: str, timeout_override: float | None = None) 
                     "REPL_PORT": str(port),
                     "REPL_EVAL_LOG": str(eval_log),
                     "REPL_WORKSPACE": str(workspace),
-                    "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1",
-                    "OPENCODE_DISABLE_CLAUDE_CODE_SKILLS": "1",
                 })
-                command = [
-                    "opencode", "run", "--pure", "--format", "json",
-                    "--agent", "repl-benchmark", "--model", model,
-                    "--dir", str(workspace), prompt,
-                ]
+                if transport == "claude":
+                    command = [
+                        "claude", "-p", "--output-format", "json",
+                        "--model", model,
+                        "--no-session-persistence",
+                        "--setting-sources", "",
+                        "--disable-slash-commands",
+                        "--strict-mcp-config",
+                        "--system-prompt", agent_system_prompt(),
+                        "--tools", "Bash,Read,Edit,Glob,Grep",
+                        "--allowedTools", "Bash(./repl-eval:*)", "Read", "Edit", "Glob", "Grep",
+                        "--permission-mode", "dontAsk",
+                    ]
+                    if effort:
+                        command += ["--effort", effort]
+                    command.append(prompt)
+                else:
+                    env.update({
+                        "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1",
+                        "OPENCODE_DISABLE_CLAUDE_CODE_SKILLS": "1",
+                    })
+                    command = [
+                        "opencode", "run", "--pure", "--format", "json",
+                        "--agent", "repl-benchmark", "--model", model,
+                        "--dir", str(workspace), prompt,
+                    ]
                 timeout = timeout_override or case.timeout
-                opencode = run_opencode(command, workspace, env, timeout)
+                opencode = run_agent_cli(command, workspace, env, timeout, transport)
             except Exception as error:  # failures belong in the case artifact
                 opencode = {
                     "exit_code": None, "timed_out": False,
@@ -378,6 +446,14 @@ def main() -> int:
     selection.add_argument("--all", action="store_true")
     parser.add_argument("--model")
     parser.add_argument("--label")
+    parser.add_argument(
+        "--transport", choices=("opencode", "claude"), default="opencode",
+        help="Noninteractive CLI to drive: OpenCode or Claude Code",
+    )
+    parser.add_argument(
+        "--effort", choices=("low", "medium", "high", "xhigh", "max"),
+        help="Claude Code effort level (claude transport only; omit for CLI default)",
+    )
     parser.add_argument("--timeout", type=float)
     parser.add_argument("--smoke", action="store_true", help="Use references without a model")
     args = parser.parse_args()
@@ -395,20 +471,25 @@ def main() -> int:
         parser.error("--label must contain only letters, numbers, dots, dashes, or underscores")
     if args.timeout is not None and args.timeout <= 0:
         parser.error("--timeout must be greater than 0")
+    if args.effort and args.transport != "claude":
+        parser.error("--effort only applies to --transport claude")
     artifact_path = RUNS_ROOT / f"{args.label}.json"
     artifact = {
         "schema_version": 1,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "label": args.label,
         "model": args.model,
+        "transport": args.transport,
+        "effort": args.effort,
         "suite": "agentic-clojure-repl",
         "suite_sha256": suite_hash(),
+        "protocol_sha256": protocol_hash(),
         "results": [],
     }
     write_json(artifact_path, artifact)
     for case in selected:
         print(f"Running {case.slug} ({case.difficulty})", flush=True)
-        result = run_case(case, args.model, args.timeout)
+        result = run_case(case, args.model, args.timeout, args.transport, args.effort)
         artifact["results"].append(result)
         write_json(artifact_path, artifact)
         print(

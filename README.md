@@ -4,28 +4,61 @@ An open, reproducible benchmark for measuring how language models write Clojure 
 
 The project deliberately reports two different capabilities:
 
-- **One-shot correctness:** 33 independent prompts, each answered in a fresh OpenCode session and checked by a deterministic grader.
+- **One-shot correctness:** 33 independent prompts, each answered in a fresh noninteractive agent session and checked by a deterministic grader.
 - **Agentic REPL debugging:** 10 buggy projects repaired in isolated temporary workspaces with a prestarted Babashka socket REPL. Correctness and REPL-use telemetry are reported separately.
 
 This is an open benchmark. Prompts, graders, buggy fixtures, and reference solutions are public. It is useful for reproducible local experiments, not as a secure or contamination-resistant leaderboard.
 
 ## Development Snapshot
 
-These are single-run exploratory observations from the pre-release development harness. The two score columns are not combined. REPL use is heuristic workflow telemetry, not a quality score. Two agentic prompts were clarified for the public release, so these historical scores must not be mixed with results from the current suite.
+These are single-run exploratory observations from the pre-release development harness. Component correctness remains primary. `Weighted overall` is a secondary correctness-only score; REPL-use telemetry is shown separately and never enters it.
 
-| Model route | One-shot | REPL correct | REPL use |
-|---|---:|---:|---:|
-| `ollama-cloud/deepseek-v4-flash` | 32/33 | 6/10 | 33/40 |
-| `ollama-cloud/deepseek-v4-pro` | 33/33 | 6/10 | 34/40 |
-| `zai-coding-plan/glm-5.2` | 33/33 | 6/10 | 33/40 |
-| `openai/gpt-5.6-sol` | 32/33 | 8/10 | 35/40 |
-| `ollama-cloud/kimi-k2.5` | 32/33 | 4/10 | 33/40 |
-| `ollama-cloud/kimi-k2.6` | 32/33 | 7/10 | 30/40 |
-| `ollama-cloud/minimax-m2.5` | 29/33 | 4/10 | 28/40 |
-| `llama-cpp-qwen27/Qwen3.6-27B-Q4_K_M.gguf` | 29/33 | 7/10 | 33/40 |
-| `llama-cpp-qwen/Qwen3.6-35B-A3B-Q4_K_M.gguf` | 23/33 | 6/10 | 26/40 |
+| Model route | One-shot | Weighted | REPL | Weighted | Overall | REPL use |
+|---|---:|---:|---:|---:|---:|---:|
+| `openai/gpt-5.6-sol` | 32/33 | 76/79 | 8/10 | 38/46 | **89.4**† | 35/40 |
+| `ollama-cloud/kimi-k2.6` | 32/33 | 77/79 | 7/10 | 33/46 | **84.6**† | 30/40 |
+| `ollama-cloud/deepseek-v4-pro` | 33/33 | 79/79 | 6/10 | 28/46 | **80.4** | 34/40 |
+| `zai-coding-plan/glm-5.2` | 33/33 | 79/79 | 6/10 | 28/46 | **80.4** | 33/40 |
+| `llama-cpp-qwen27/Qwen3.6-27B-Q4_K_M.gguf` | 29/33 | 67/79 | 7/10 | 33/46 | **78.3** | 33/40 |
+| `ollama-cloud/deepseek-v4-flash` | 32/33 | 75/79 | 6/10 | 28/46 | **77.9** | 33/40 |
+| `ollama-cloud/kimi-k2.5` | 32/33 | 76/79 | 4/10 | 18/46 | **67.7** | 33/40 |
+| `ollama-cloud/minimax-m2.5` | 29/33 | 66/79 | 4/10 | 18/46 | **61.3** | 28/40 |
+| `llama-cpp-qwen/Qwen3.6-35B-A3B-Q4_K_M.gguf` | 23/33 | 48/79 | 6/10 | 28/46 | **60.8** | 26/40 |
+
+The overall formula is `100 * (0.5 * one-shot-weighted/79 + 0.5 * REPL-weighted/46)`. Task weights range from 1 to 5 and are assigned from semantic breadth, state/effects, runtime lifecycle, edge cases, and interacting behavior. See [`docs/WEIGHTING.md`](docs/WEIGHTING.md) and the machine-readable [`weights.json`](weights.json).
+
+Every row is historical because two REPL prompts were clarified for the public release and these artifacts predate protocol fingerprints. † GPT-5.6 Sol and Kimi K2.6 also each contain one null-response infrastructure failure counted as false in this retrospective calculation. Complete current-treatment reruns are required before treating any row as a current result. The v1 weights were assigned retrospectively after these results existed, not preregistered.
+
+### Claude Models (Claude Code transport)
+
+Single-run results on the current public suite via Claude Code's noninteractive CLI (`--transport claude`), all at `--effort low` — the minimum reasoning setting (see [`CLAUDE.md`](CLAUDE.md) and [`docs/CLAUDE_TRANSPORT.md`](docs/CLAUDE_TRANSPORT.md)). These runs use a different harness and the clarified public agentic prompts, so they are not directly comparable to the OpenCode development snapshot above.
+
+| Model | Effort | One-shot | Weighted | REPL | Weighted | Overall | REPL use |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `claude-fable-5` | low | 33/33 | 79/79 | 7/10 | 33/46 | **85.9** | 36/40 |
+| `claude-opus-4-8` | low | 33/33 | 79/79 | 7/10 | 33/46 | **85.9** | 37/40 |
+| `claude-sonnet-5` | low | 32/33 | 76/79 | 7/10 | 33/46 | **84.0** | 20/40 |
+| `claude-haiku-4-5` | low | 32/33 | 76/79 | 7/10 | 33/46 | **84.0** | 34/40 |
+
+These artifacts match the current suite and protocol fingerprints and contain no infrastructure-invalid cases. The v1 weighting policy itself remains retrospective and not preregistered.
 
 See [`results/development-snapshot.md`](results/development-snapshot.md) for provenance and caveats. Elapsed measurements are intentionally omitted here: they include different providers, hardware, queues, rate limits, and timeout policies and are not cross-provider speed comparisons.
+
+## What The Benchmark Runs
+
+**One-shot suite (33 tasks, defined in [`suites/eval_clojure.py`](suites/eval_clojure.py)).** Each task is a single prompt answered with no tools, checked deterministically by executing the response with Babashka or comparing it structurally as EDN. The tasks are drawn from real Clojure/ClojureScript web-application patterns — reitit routes, hiccup components, malli schemas, HoneySQL query maps, Ring handlers, Datomic-style pull results, and i18n/data utilities:
+
+| Category | Count | What it exercises |
+|---|---:|---|
+| Function writing (`fn_*`) | 6 | Small idiomatic utilities: nil-safe normalization, recursive map cleaning, vector splicing, relative-time formatting |
+| Harder multi-step functions (`hard_*`) | 13 | Auth handlers with ownership checks, conditional HoneySQL builders, join-row nesting, transducer-friendly `reduce`/`reduced`, deep merge, laziness-safe effects |
+| Bug fixes (`fix_*`) | 4 | Spot and repair a planted bug: wrong `select-keys` direction, unguarded `update`, lazy `map` side effects, `->` vs `->>` |
+| Data-structure emission (`ds_*`) | 3 | Emit exact HoneySQL, hiccup, and malli EDN shapes |
+| EDN/JSON transformation (`edn_*`, `json_*`) | 3 | Aggregate entity vectors, convert JSON config to EDN, extract route names |
+| Strict-format answers (`strict_*`) | 2 | Lint diagnosis and exact Ring response maps with nothing but the answer |
+| Context-augmented variants (`ctx_*`) | 2 | The same checkers as two base tasks, with representative project source prepended as context |
+
+**Agentic REPL suite (10 cases, defined in [`repl_cases.py`](repl_cases.py) with fixtures in [`repl-cases/`](repl-cases/)).** Each case is a small buggy project copied into a temporary workspace with a live Babashka socket REPL. The model must diagnose stateful runtime behavior, edit `src`, reload, and verify; a fresh-process grader then decides correctness. The cases target Clojure-specific runtime semantics: lazy realization after resource closure, `defonce` state vs. changed disk rules, history-dependent cache contamination, idempotent event folding, live multimethod dispatch tables, macro-captured functions vs. Var roots, transducer completion arity, authorization-before-realization ordering, capability-graph planning, and primary-vs-derived atom state. Difficulty ranges from medium to extremely-hard; the full case table is in [`repl-cases/README.md`](repl-cases/README.md).
 
 ## Architecture
 
@@ -33,7 +66,7 @@ See [`results/development-snapshot.md`](results/development-snapshot.md) for pro
 model provider or llama.cpp
           |
           v
-OpenCode noninteractive CLI
+OpenCode or Claude Code CLI
      |                |
      v                v
 33 one-shot tasks   10 temporary project copies
@@ -52,6 +85,7 @@ The one-shot agent has tools disabled. The REPL agent can inspect and edit its c
 - Python 3.11 or newer; the harness uses only the standard library
 - [Babashka](https://babashka.org/) 1.12.218 or newer
 - [OpenCode](https://opencode.ai/) 1.15.12 or newer
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 2.1.216 or newer for optional Claude transport runs
 - [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` for local GGUF models
 - Provider credentials configured in OpenCode for cloud runs
 
@@ -162,9 +196,16 @@ Generate matrices from local raw runs:
 ```bash
 python3 matrix.py
 python3 repl_matrix.py
+python3 overall_matrix.py
 ```
 
-Do not mix artifacts with different suite hashes, harness revisions, model routes, or materially different inference settings.
+Validate the weighting manifest without model artifacts:
+
+```bash
+python3 overall_matrix.py --validate
+```
+
+Do not mix artifacts with different suite or protocol hashes, harness revisions, model routes, or materially different inference settings.
 
 ## Outputs And Privacy
 
@@ -176,6 +217,8 @@ Generated `artifacts/tests.json`, matrices under `artifacts/`, and raw REPL logs
 
 - Public graders and reference solutions make auditability possible but make contamination possible. Do not claim the benchmark is unseen.
 - Current results are one run per route and do not estimate variance or statistical significance.
+- The weighted overall is a secondary 50/50 policy choice, not an empirical claim that the two suites are interchangeable.
+- The initial v1 weights were assigned retrospectively and are not preregistered; future weights must be frozen through blind review before scored runs are inspected.
 - A pass means the public deterministic checker accepted the answer or final source. It does not prove general Clojure competence.
 - REPL-use points indicate connection, project evaluation, diagnostic-looking evaluation, and post-edit evaluation. The signal is heuristic and can be gamed or earned without a correct repair.
 - OpenCode permissions reduce accidental access but do not isolate generated code at the operating-system level.
@@ -190,13 +233,15 @@ More detail is in [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md).
 
 | Path | Purpose |
 |---|---|
-| `runner.py` | One-shot OpenCode runner |
+| `runner.py` | One-shot OpenCode and Claude Code runner |
 | `suites/eval_clojure.py` | Bundled 33-task one-shot suite and graders |
 | `matrix.py` | One-shot aggregate generator |
 | `repl_runner.py` | Stateful REPL case runner and no-model smoke lifecycle |
 | `repl_cases.py` | Agentic case metadata and prompts |
 | `repl_eval.py` | Narrow socket-REPL client copied into case workspaces |
 | `repl_matrix.py` | Agentic aggregate generator |
+| `overall_matrix.py` | Strict weighted correctness aggregate generator |
+| `weights.json` | Versioned task weights, rubric vectors, and suite hashes |
 | `validate_new_cases.py` | One-shot grader/reference validator |
 | `validate_repl_cases.py` | Buggy-fixture and reference validator |
 | `repl-cases/` | Public fixtures, graders, and reference solutions |

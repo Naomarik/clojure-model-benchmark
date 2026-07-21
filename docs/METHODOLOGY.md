@@ -2,13 +2,13 @@
 
 ## Scope
 
-Clojure Model Benchmark measures two related but distinct behaviors: producing a correct answer to a self-contained Clojure prompt and repairing a small stateful Clojure project with access to a live REPL. It does not produce a combined overall score.
+Clojure Model Benchmark measures two related but distinct behaviors: producing a correct answer to a self-contained Clojure prompt and repairing a small stateful Clojure project with access to a live REPL. Their separate correctness scores remain primary. A secondary correctness-only overall score applies fixed intrinsic-demand weights within each suite and normalizes the suites to equal shares. See [`WEIGHTING.md`](WEIGHTING.md) for the complete rubric, formula, versioning, and invalid-run policy.
 
 All prompts, graders, fixtures, and references are public. This favors auditability and local reproducibility over secrecy. It also means results cannot establish that a model has never seen benchmark material.
 
 ## One-Shot Correctness
 
-The one-shot suite has 33 tasks spanning functions, data structures, EDN-shaped output, strict formatting, library idioms, and bug fixes. Each task consists of a name, prompt, and deterministic Python checker.
+The one-shot suite has 33 tasks spanning functions, data structures, EDN-shaped output, strict formatting, library idioms, and bug fixes. Each task consists of a name, prompt, and deterministic Python checker. By category: 6 small utility functions (`fn_*`), 13 harder multi-step functions (`hard_*`), 4 planted-bug repairs (`fix_*`), 3 exact EDN data-structure emissions (`ds_*`), 3 EDN/JSON transformations, 2 strict-format answers (`strict_*`), and 2 context-augmented variants of base tasks (`ctx_*`). Domains follow real Clojure/ClojureScript web work: reitit, hiccup, malli, HoneySQL, Ring, and Datomic-style data wrangling. Checkers execute responses with Babashka (`check_bb_output`), compare structurally as EDN (`check_edn_equal`), or require an exact string (`check_exact`).
 
 For each task, the runner:
 
@@ -49,6 +49,12 @@ Each case can receive one heuristic point for each of four observed signals:
 
 The maximum is 40 across 10 cases. This telemetry describes a rough workflow shape. It does not establish that an evaluation was useful, causally related to the repair, idiomatic, safe, or correct. The heuristic can miss meaningful work and can be gamed. Never merge it with correctness.
 
+## Weighted Overall
+
+The optional overall metric combines only the binary one-shot and fresh-process REPL correctness outcomes. It excludes REPL-use telemetry, elapsed time, tokens, and cost. Task weights use a five-dimension intrinsic-demand rubric. The initial v1 assignment was retrospective because existing results were already available; future additions require the blind review protocol in `WEIGHTING.md`. Weighted one-shot and REPL rates are each normalized to 50 percent of the overall score so suite case counts do not silently determine capability importance.
+
+Always publish the unweighted and weighted component scores alongside overall. `overall_matrix.py` rejects suite or protocol treatment mismatches and infrastructure-invalid runs by default. Its explicit override flags produce visibly historical or provisional output, not a current valid result.
+
 ## Validation
 
 `validate_new_cases.py` applies known-good answers to the one-shot checkers. `validate_repl_cases.py` establishes that each public REPL fixture loads, fails its grader before repair, and passes after applying the reference overlay. `repl_runner.py --all --smoke` exercises socket startup, bootstrap, reference reload through the client, shutdown, and grading without calling a model.
@@ -59,7 +65,7 @@ Validation establishes internal fixture consistency, not absence of grader bugs 
 
 A useful result record includes:
 
-- benchmark version or source revision and suite hash;
+- benchmark version or source revision, suite hash, and protocol hash;
 - exact OpenCode version and model route;
 - provider-visible model version when available;
 - local model filename/hash, quantization, llama.cpp revision, and launch flags;
@@ -68,7 +74,7 @@ A useful result record includes:
 - timeouts, concurrency, context/output limits, and run count;
 - date and any observed provider incidents or retries.
 
-Do not aggregate runs from different suite hashes. Report repeated runs individually or with a documented summary statistic rather than silently selecting the best run.
+Do not aggregate runs from different suite or protocol treatment hashes. Report repeated runs individually or with a documented summary statistic rather than silently selecting the best run.
 
 ## Timing
 
