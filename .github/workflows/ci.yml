@@ -21,7 +21,7 @@ jobs:
           python-version: "3.11"
 
       - name: Set up pinned Babashka
-        uses: DeLaGuardo/setup-clojure@13.2
+        uses: DeLaGuardo/setup-clojure@13.5
         with:
           bb: "1.12.218"
 
