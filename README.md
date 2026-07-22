@@ -11,38 +11,67 @@ This is an open benchmark. Prompts, graders, buggy fixtures, and reference solut
 
 ## Development Snapshot
 
-These are single-run exploratory observations from the pre-release development harness. Component correctness remains primary. `Weighted overall` is a secondary correctness-only score; REPL-use telemetry is shown separately and never enters it.
+These are single-run exploratory observations from the pre-release development harness. This table contains correctness results only. Component correctness remains primary; `Weighted overall` is a secondary correctness-only score.
 
-| Model route | One-shot | Weighted | REPL | Weighted | Overall | REPL use |
-|---|---:|---:|---:|---:|---:|---:|
-| `openai/gpt-5.6-sol` | 32/33 | 76/79 | 8/10 | 38/46 | **89.4**† | 35/40 |
-| `ollama-cloud/kimi-k2.6` | 32/33 | 77/79 | 7/10 | 33/46 | **84.6**† | 30/40 |
-| `ollama-cloud/deepseek-v4-pro` | 33/33 | 79/79 | 6/10 | 28/46 | **80.4** | 34/40 |
-| `zai-coding-plan/glm-5.2` | 33/33 | 79/79 | 6/10 | 28/46 | **80.4** | 33/40 |
-| `llama-cpp-qwen27/Qwen3.6-27B-Q4_K_M.gguf` | 29/33 | 67/79 | 7/10 | 33/46 | **78.3** | 33/40 |
-| `ollama-cloud/deepseek-v4-flash` | 32/33 | 75/79 | 6/10 | 28/46 | **77.9** | 33/40 |
-| `ollama-cloud/kimi-k2.5` | 32/33 | 76/79 | 4/10 | 18/46 | **67.7** | 33/40 |
-| `ollama-cloud/minimax-m2.5` | 29/33 | 66/79 | 4/10 | 18/46 | **61.3** | 28/40 |
-| `llama-cpp-qwen/Qwen3.6-35B-A3B-Q4_K_M.gguf` | 23/33 | 48/79 | 6/10 | 28/46 | **60.8** | 26/40 |
+| Model route | One-shot correct | One-shot weighted | Agentic correct | Agentic weighted | Weighted overall |
+|---|---:|---:|---:|---:|---:|
+| `openai/gpt-5.6-sol` | 32/33 | 76/79 | 8/10 | 38/46 | **89.4**† |
+| `ollama-cloud/kimi-k2.6` | 32/33 | 77/79 | 7/10 | 33/46 | **84.6**† |
+| `ollama-cloud/deepseek-v4-pro` | 33/33 | 79/79 | 6/10 | 28/46 | **80.4** |
+| `zai-coding-plan/glm-5.2` | 33/33 | 79/79 | 6/10 | 28/46 | **80.4** |
+| `llama-cpp-qwen27/Qwen3.6-27B-Q4_K_M.gguf` | 29/33 | 67/79 | 7/10 | 33/46 | **78.3** |
+| `ollama-cloud/deepseek-v4-flash` | 32/33 | 75/79 | 6/10 | 28/46 | **77.9** |
+| `ollama-cloud/kimi-k2.5` | 32/33 | 76/79 | 4/10 | 18/46 | **67.7** |
+| `ollama-cloud/minimax-m2.5` | 29/33 | 66/79 | 4/10 | 18/46 | **61.3** |
+| `llama-cpp-qwen/Qwen3.6-35B-A3B-Q4_K_M.gguf` | 23/33 | 48/79 | 6/10 | 28/46 | **60.8** |
 
 The overall formula is `100 * (0.5 * one-shot-weighted/79 + 0.5 * REPL-weighted/46)`. Task weights range from 1 to 5 and are assigned from semantic breadth, state/effects, runtime lifecycle, edge cases, and interacting behavior. See [`docs/WEIGHTING.md`](docs/WEIGHTING.md) and the machine-readable [`weights.json`](weights.json).
 
 Every row is historical because two REPL prompts were clarified for the public release and these artifacts predate protocol fingerprints. † GPT-5.6 Sol and Kimi K2.6 also each contain one null-response infrastructure failure counted as false in this retrospective calculation. Complete current-treatment reruns are required before treating any row as a current result. The v1 weights were assigned retrospectively after these results existed, not preregistered.
 
+**Run observations (not correctness scores).** `REPL workflow signals` is a diagnostic telemetry count, not tests passed: each of the 10 agentic cases records connection, project evaluation, diagnostic evaluation, and project evaluation after a source change. It does not enter the weighted overall score.
+
+| Model route | One-shot wall time | Agentic wall time | Agentic timeouts | REPL workflow signals |
+|---|---:|---:|---:|---:|
+| `openai/gpt-5.6-sol` | 2m 51s | 14m 02s | 0 | 35/40 |
+| `ollama-cloud/kimi-k2.6` | 10m 57s | 29m 03s | 0 | 30/40 |
+| `ollama-cloud/deepseek-v4-pro` | 7m 58s | 32m 36s | 0 | 34/40 |
+| `zai-coding-plan/glm-5.2` | 8m 21s | 52m 33s | 0 | 33/40 |
+| `llama-cpp-qwen27/Qwen3.6-27B-Q4_K_M.gguf` | 17m 08s | 48m 17s | 0 | 33/40 |
+| `ollama-cloud/deepseek-v4-flash` | 7m 11s | 16m 07s | 0 | 33/40 |
+| `ollama-cloud/kimi-k2.5` | 10m 33s | 25m 40s | 0 | 33/40 |
+| `ollama-cloud/minimax-m2.5` | 8m 02s | 66m 22s | 6 | 28/40 |
+| `llama-cpp-qwen/Qwen3.6-35B-A3B-Q4_K_M.gguf` | 6m 22s | 38m 30s | 3 | 26/40 |
+
+Elapsed values are recorded end-to-end wall time summed across tasks. They include provider latency, queueing, generation, tool use, process startup, local hardware, and timeouts, so they describe these runs but are not controlled cross-provider speed comparisons. Exact seconds and per-task/per-case values are preserved in [`artifacts/matrix.json`](artifacts/matrix.json) and [`artifacts/repl-matrix.json`](artifacts/repl-matrix.json).
+
+The local Qwen routes ran through a ROCm/HIP `llama.cpp` build on an AMD Ryzen AI Max+ 395 with Radeon 8060S (`gfx1151`, 40 GPU compute units) and 128 GB-class unified memory (121 GiB visible to Linux). The local server used full GPU offload, flash attention, four slots, and thinking disabled; the dense 27B route used MTP speculative decoding and the 35B-A3B route used n-gram speculation. The benchmark machine is configured with the ACPI `performance` platform profile, `performance` CPU governor, and active AMD P-state. The current documented `llama.cpp` build is `9671` (`c1304d7b28e1`); historical artifacts do not fingerprint the machine power state or server revision.
+
 ### Claude Models (Claude Code transport)
 
-Single-run results on the current public suite via Claude Code's noninteractive CLI (`--transport claude`), all at `--effort low` — the minimum reasoning setting (see [`CLAUDE.md`](CLAUDE.md) and [`docs/CLAUDE_TRANSPORT.md`](docs/CLAUDE_TRANSPORT.md)). These runs use a different harness and the clarified public agentic prompts, so they are not directly comparable to the OpenCode development snapshot above.
+Single-run results on the current public suite via Claude Code's noninteractive CLI (`--transport claude`), all at `--effort low`, the minimum reasoning setting (see [`CLAUDE.md`](CLAUDE.md) and [`docs/CLAUDE_TRANSPORT.md`](docs/CLAUDE_TRANSPORT.md)). These runs use a different harness and the clarified public agentic prompts, so they are not directly comparable to the OpenCode development snapshot above. The table contains correctness results only.
 
-| Model | Effort | One-shot | Weighted | REPL | Weighted | Overall | REPL use |
-|---|---|---:|---:|---:|---:|---:|---:|
-| `claude-fable-5` | low | 33/33 | 79/79 | 7/10 | 33/46 | **85.9** | 36/40 |
-| `claude-opus-4-8` | low | 33/33 | 79/79 | 7/10 | 33/46 | **85.9** | 37/40 |
-| `claude-sonnet-5` | low | 32/33 | 76/79 | 7/10 | 33/46 | **84.0** | 20/40 |
-| `claude-haiku-4-5` | low | 32/33 | 76/79 | 7/10 | 33/46 | **84.0** | 34/40 |
+| Model | Effort | One-shot correct | One-shot weighted | Agentic correct | Agentic weighted | Weighted overall |
+|---|---|---:|---:|---:|---:|---:|
+| `claude-fable-5` | low | 33/33 | 79/79 | 7/10 | 33/46 | **85.9** |
+| `claude-opus-4-8` | low | 33/33 | 79/79 | 7/10 | 33/46 | **85.9** |
+| `claude-sonnet-5` | low | 32/33 | 76/79 | 7/10 | 33/46 | **84.0** |
+| `claude-haiku-4-5` | low | 32/33 | 76/79 | 7/10 | 33/46 | **84.0** |
+
+**Run observations (not correctness scores).** Wall time has the same end-to-end meaning and limitations described above.
+
+| Model | One-shot wall time | Agentic wall time | Agentic timeouts | REPL workflow signals |
+|---|---:|---:|---:|---:|
+| `claude-fable-5` | 2m 02s | 4m 42s | 0 | 36/40 |
+| `claude-opus-4-8` | 1m 57s | 5m 33s | 0 | 37/40 |
+| `claude-sonnet-5` | 1m 56s | 6m 44s | 0 | 20/40 |
+| `claude-haiku-4-5` | 8m 21s | 24m 53s | 0 | 34/40 |
+
+Exact Claude timings are preserved per task and case in the corresponding [`artifacts/runs/`](artifacts/runs/) and [`artifacts/repl-runs/`](artifacts/repl-runs/) JSON files.
 
 These artifacts match the current suite and protocol fingerprints and contain no infrastructure-invalid cases. The v1 weighting policy itself remains retrospective and not preregistered.
 
-See [`results/development-snapshot.md`](results/development-snapshot.md) for provenance and caveats. Elapsed measurements are intentionally omitted here: they include different providers, hardware, queues, rate limits, and timeout policies and are not cross-provider speed comparisons.
+See [`results/development-snapshot.md`](results/development-snapshot.md) for provenance and caveats.
 
 ## What The Benchmark Runs
 
